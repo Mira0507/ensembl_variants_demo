@@ -1,0 +1,131 @@
+---
+title: "Retrieving Human Variant Alleles from Ensembl Using API"
+author: "Mira Sohn" 
+output: html_document
+---
+
+
+
+### Aims
+
+#### - This workflow is aimed at retrieving human variant alleles from Ensembl by using the [Ensembl REST API (GET overlap/id/:id)](https://rest.ensembl.org/documentation/info/overlap_id)
+
+#### - Reference: [The Ensembl Variant Effect Predictor (McLaren et al., 2016)](https://pubmed.ncbi.nlm.nih.gov/27268795)
+
+
+### Conda environment
+
+#### - This analysis was performed under [conda](https://conda.io/projects/conda/en/latest/index.html) environment (see the [recipe](https://github.com/Mira0507/TRF_demo/blob/master/conda_r.yml))
+
+
+```{r global_options, include=FALSE}
+
+
+knitr::opts_chunk$set(
+    warning=FALSE,
+    message=FALSE
+    )
+
+
+```
+
+### Loading packages
+
+```{r loading_packages}
+
+library(tidyverse)
+library(httr) 
+library(jsonlite) 
+
+```
+
+### Importing gene ids 
+
+#### - This demonstration uses ensembl human gene id 
+
+
+```{r importing_geneid}
+
+# Importing my genes to a vector 
+geneid <- scan("geneid.txt", character(), quote="")
+
+# Exploring the imported object 
+geneid[1:10]
+class(geneid)
+length(geneid)
+
+
+
+```
+
+
+### Retrieving data
+
+```{r count_variants}
+
+
+# Assign the server for API 
+server <- "https://rest.ensembl.org"
+
+
+variants.df <- data.frame()
+
+for (i in 1:length(geneid)) {
+
+
+    # Retrieve data using ensembl gene ids 
+    ext <- paste0("/overlap/id/",
+                  geneid[i],
+                  "?feature=variation")
+
+    r <- GET(paste(server, ext, sep = ""), 
+             content_type("application/json"))
+     
+    stop_for_status(r)
+
+    # Extract the variant ids 
+    df <- data.frame(t(sapply(content(r),c))) %>% 
+        gather("Variable", "Variant") %>% 
+        dplyr::filter(str_detect(Variant, "rs")) %>%
+        mutate(GENEID=geneid[i]) %>%
+        dplyr::select(-Variable) 
+
+    # Combine the retrieved variants to variants.df by rbinding
+    variants.df <- rbind(variants.df, df)
+
+}
+
+# Ensure that any duplicated rows are removed
+variants.df <- variants.df[!duplicated(variants.df),] %>%
+    mutate(Variant=unlist(Variant))
+
+# Explore the output data frame
+head(variants.df)
+dim(variants.df)
+glimpse(variants.df)
+
+# Count the number of variant alleles per gene id 
+variants.sum <- variants.df %>%
+    group_by(GENEID) %>%
+    summarize(Counts=n())
+
+# Explore the output data frame
+head(variants.sum)
+dim(variants.sum)
+glimpse(variants.sum)
+
+# Save the output as csv files
+write.csv(variants.df, "total_variants.csv")
+write.csv(variants.sum, "counted_variants.csv")
+```
+
+
+
+
+### Session Info
+
+```{r session_info}
+
+sessionInfo()
+
+```
