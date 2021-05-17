@@ -5,7 +5,6 @@ output: html_document
 ---
 
 
-
 ### Aims
 
 #### - This workflow is aimed at retrieving human variant alleles from Ensembl by using the [Ensembl REST API (GET overlap/id/:id)](https://rest.ensembl.org/documentation/info/overlap_id)
@@ -68,7 +67,9 @@ length(geneid)
 server <- "https://rest.ensembl.org"
 
 
+# Create an empty vector storing the number of variant alleles per gene id 
 variants.df <- data.frame()
+
 
 for (i in 1:length(geneid)) {
 
@@ -78,26 +79,57 @@ for (i in 1:length(geneid)) {
                   geneid[i],
                   "?feature=variation")
 
-    r <- GET(paste(server, ext, sep = ""), 
-             content_type("application/json"))
+    r <- GET(paste(server, ext, sep = ""), content_type("application/json"))
+
      
     stop_for_status(r)
 
     # Extract the variant ids 
     df <- data.frame(t(sapply(content(r),c))) %>% 
-        gather("Variable", "Variant") %>% 
-        dplyr::filter(str_detect(Variant, "rs")) %>%
-        mutate(GENEID=geneid[i]) %>%
-        dplyr::select(-Variable) 
+        gather("Variable", "Value") 
 
-    # Combine the retrieved variants to variants.df by rbinding
-    variants.df <- rbind(variants.df, df)
+    # If no variant is found:
+    if (ncol(df) == 0) {
+
+        # gene id with no variant is skipped
+        df.filtered <- data.frame(GENEID=c(), 
+                                  Variants=c()) 
+
+        print(paste0("Number of variant alleles in ", 
+                     geneid[i], 
+                     ": 0")) 
+
+    } else {
+
+        # Save variant ids filtered as a data frame
+        df <- df %>% 
+            dplyr::filter(str_detect(Value, "rs")) %>% 
+            mutate(Value=unlist(Value)) 
+
+        # Create a vector storing unique variant ids
+        var <- unique(df$Value)
+
+        # Create a data frame storing gene id and corresponding unique variant ids 
+        df.filtered <- data.frame(GENEID=rep(geneid[i], 
+                                             length(var)),
+                                  Variants=var)
+
+        print(paste0("Number of variant alleles in ", 
+                     geneid[i], 
+                     ": ", 
+                     length(var)))
+
+    }
+
+    # Combine the variant allele data frame to the variant.df data frame
+    variants.df <- rbind(variants.df, df.filtered)
+
 
 }
 
+
 # Ensure that any duplicated rows are removed
-variants.df <- variants.df[!duplicated(variants.df),] %>%
-    mutate(Variant=unlist(Variant))
+variants.df <- variants.df[!duplicated(variants.df),] 
 
 # Explore the output data frame
 head(variants.df)
@@ -107,7 +139,7 @@ glimpse(variants.df)
 # Count the number of variant alleles per gene id 
 variants.sum <- variants.df %>%
     group_by(GENEID) %>%
-    summarize(Counts=n())
+    summarize(Counts=n()) 
 
 # Explore the output data frame
 head(variants.sum)
@@ -117,6 +149,10 @@ glimpse(variants.sum)
 # Save the output as csv files
 write.csv(variants.df, "total_variants.csv")
 write.csv(variants.sum, "counted_variants.csv")
+
+
+## NOTE: The genes missing in the csv files have zero variant!! 
+
 ```
 
 
