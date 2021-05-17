@@ -200,13 +200,13 @@ geneid &lt;- scan(&quot;geneid.txt&quot;, character(), quote=&quot;&quot;)
 
 # Exploring the imported object 
 geneid[1:10]</code></pre>
-<pre><code>##  [1] &quot;ENSG00000125148&quot; &quot;ENSG00000101361&quot; &quot;ENSG00000162676&quot; &quot;ENSG00000164687&quot;
-##  [5] &quot;ENSG00000127951&quot; &quot;ENSG00000108691&quot; &quot;ENSG00000171791&quot; &quot;ENSG00000079459&quot;
-##  [9] &quot;ENSG00000069011&quot; &quot;ENSG00000130164&quot;</code></pre>
+<pre><code>##  [1] &quot;ENSG00000101846&quot; &quot;ENSG00000167552&quot; &quot;ENSG00000005075&quot; &quot;ENSG00000228451&quot;
+##  [5] &quot;ENSG00000260747&quot; &quot;ENSG00000271425&quot; &quot;ENSG00000204389&quot; &quot;ENSG00000242960&quot;
+##  [9] &quot;ENSG00000263001&quot; &quot;ENSG00000274840&quot;</code></pre>
 <pre class="r"><code>class(geneid)</code></pre>
 <pre><code>## [1] &quot;character&quot;</code></pre>
 <pre class="r"><code>length(geneid)</code></pre>
-<pre><code>## [1] 11</code></pre>
+<pre><code>## [1] 50</code></pre>
 </div>
 </div>
 <div id="retrieving-data" class="section level3">
@@ -215,7 +215,9 @@ geneid[1:10]</code></pre>
 server &lt;- &quot;https://rest.ensembl.org&quot;
 
 
+# Create an empty vector storing the number of variant alleles per gene id 
 variants.df &lt;- data.frame()
+
 
 for (i in 1:length(geneid)) {
 
@@ -224,69 +226,151 @@ for (i in 1:length(geneid)) {
                   geneid[i],
                   &quot;?feature=variation&quot;)
 
-    r &lt;- GET(paste(server, ext, sep = &quot;&quot;), 
-             content_type(&quot;application/json&quot;))
+    r &lt;- GET(paste(server, ext, sep = &quot;&quot;), content_type(&quot;application/json&quot;))
+
      
     stop_for_status(r)
 
     # Extract the variant ids 
     df &lt;- data.frame(t(sapply(content(r),c))) %&gt;% 
-        gather(&quot;Variable&quot;, &quot;Variant&quot;) %&gt;% 
-        dplyr::filter(str_detect(Variant, &quot;rs&quot;)) %&gt;%
-        mutate(GENEID=geneid[i]) %&gt;%
-        dplyr::select(-Variable) 
+        gather(&quot;Variable&quot;, &quot;Value&quot;) 
 
-    # Combine the retrieved variants to variants.df by rbinding
-    variants.df &lt;- rbind(variants.df, df)
+    # If no variant is found:
+    if (ncol(df) == 0) {
 
-}
+        # gene id with no variant is skipped
+        df.filtered &lt;- data.frame(GENEID=c(), 
+                                  Variants=c()) 
 
-# Ensure that any duplicated rows are removed
-variants.df &lt;- variants.df[!duplicated(variants.df),] %&gt;%
-    mutate(Variant=unlist(Variant))
+        print(paste0(&quot;Number of variant alleles in &quot;, 
+                     geneid[i], 
+                     &quot;: 0&quot;)) 
+
+    } else {
+
+        # Save variant ids filtered as a data frame
+        df &lt;- df %&gt;% 
+            dplyr::filter(str_detect(Value, &quot;rs&quot;)) %&gt;% 
+            mutate(Value=unlist(Value)) 
+
+        # Create a vector storing unique variant ids
+        var &lt;- unique(df$Value)
+
+        # Create a data frame storing gene id and corresponding unique variant ids 
+        df.filtered &lt;- data.frame(GENEID=rep(geneid[i], 
+                                             length(var)),
+                                  Variants=var)
+
+        print(paste0(&quot;Number of variant alleles in &quot;, 
+                     geneid[i], 
+                     &quot;: &quot;, 
+                     length(var)))
+
+    }
+
+    # Combine the variant allele data frame to the variant.df data frame
+    variants.df &lt;- rbind(variants.df, df.filtered)
+
+
+}</code></pre>
+<pre><code>## [1] &quot;Number of variant alleles in ENSG00000101846: 108520&quot;
+## [1] &quot;Number of variant alleles in ENSG00000167552: 1195&quot;
+## [1] &quot;Number of variant alleles in ENSG00000005075: 1921&quot;
+## [1] &quot;Number of variant alleles in ENSG00000228451: 1697&quot;
+## [1] &quot;Number of variant alleles in ENSG00000260747: 128&quot;
+## [1] &quot;Number of variant alleles in ENSG00000271425: 42095&quot;
+## [1] &quot;Number of variant alleles in ENSG00000204389: 590&quot;
+## [1] &quot;Number of variant alleles in ENSG00000242960: 143&quot;
+## [1] &quot;Number of variant alleles in ENSG00000263001: 24187&quot;
+## [1] &quot;Number of variant alleles in ENSG00000274840: 6501&quot;
+## [1] &quot;Number of variant alleles in ENSG00000219507: 123&quot;
+## [1] &quot;Number of variant alleles in ENSG00000214391: 472&quot;
+## [1] &quot;Number of variant alleles in ENSG00000255303: 2476&quot;
+## [1] &quot;Number of variant alleles in ENSG00000267736: 158&quot;
+## [1] &quot;Number of variant alleles in ENSG00000140839: 4279&quot;
+## [1] &quot;Number of variant alleles in ENSG00000228532: 70&quot;
+## [1] &quot;Number of variant alleles in ENSG00000234545: 6937&quot;
+## [1] &quot;Number of variant alleles in ENSG00000244161: 1892&quot;
+## [1] &quot;Number of variant alleles in ENSG00000215784: 2860&quot;
+## [1] &quot;Number of variant alleles in ENSG00000140459: 6816&quot;
+## [1] &quot;Number of variant alleles in ENSG00000271254: 0&quot;
+## [1] &quot;Number of variant alleles in ENSG00000225813: 413&quot;
+## [1] &quot;Number of variant alleles in ENSG00000163283: 1634&quot;
+## [1] &quot;Number of variant alleles in ENSG00000174469: 578486&quot;
+## [1] &quot;Number of variant alleles in ENSG00000254635: 2798&quot;
+## [1] &quot;Number of variant alleles in ENSG00000235314: 842&quot;
+## [1] &quot;Number of variant alleles in ENSG00000262188: 1756&quot;
+## [1] &quot;Number of variant alleles in ENSG00000214425: 9159&quot;
+## [1] &quot;Number of variant alleles in ENSG00000268916: 576&quot;
+## [1] &quot;Number of variant alleles in ENSG00000237510: 1238&quot;
+## [1] &quot;Number of variant alleles in ENSG00000196139: 20709&quot;
+## [1] &quot;Number of variant alleles in ENSG00000273472: 344&quot;
+## [1] &quot;Number of variant alleles in ENSG00000165949: 2856&quot;
+## [1] &quot;Number of variant alleles in ENSG00000235559: 83&quot;
+## [1] &quot;Number of variant alleles in ENSG00000214518: 242&quot;
+## [1] &quot;Number of variant alleles in ENSG00000228218: 250&quot;
+## [1] &quot;Number of variant alleles in ENSG00000233476: 336&quot;
+## [1] &quot;Number of variant alleles in ENSG00000223722: 101&quot;
+## [1] &quot;Number of variant alleles in ENSG00000177855: 131&quot;
+## [1] &quot;Number of variant alleles in ENSG00000224546: 447&quot;
+## [1] &quot;Number of variant alleles in ENSG00000259341: 2929&quot;
+## [1] &quot;Number of variant alleles in ENSG00000272189: 409&quot;
+## [1] &quot;Number of variant alleles in ENSG00000284727: 21139&quot;
+## [1] &quot;Number of variant alleles in ENSG00000037042: 2093&quot;
+## [1] &quot;Number of variant alleles in ENSG00000153902: 5084&quot;
+## [1] &quot;Number of variant alleles in ENSG00000276550: 19162&quot;
+## [1] &quot;Number of variant alleles in ENSG00000146707: 5179&quot;
+## [1] &quot;Number of variant alleles in ENSG00000166268: 31376&quot;
+## [1] &quot;Number of variant alleles in ENSG00000243678: 1642&quot;
+## [1] &quot;Number of variant alleles in ENSG00000266869: 18557&quot;</code></pre>
+<pre class="r"><code># Ensure that any duplicated rows are removed
+variants.df &lt;- variants.df[!duplicated(variants.df),] 
 
 # Explore the output data frame
 head(variants.df)</code></pre>
-<pre><code>##        Variant          GENEID
-## 1 rs1267059404 ENSG00000125148
-## 2  rs749890299 ENSG00000125148
-## 3 rs1397690604 ENSG00000125148
-## 4 rs1271638610 ENSG00000125148
-## 5 rs1047454895 ENSG00000125148
-## 6 rs1374626946 ENSG00000125148</code></pre>
+<pre><code>##            GENEID     Variants
+## 1 ENSG00000101846 rs1002716891
+## 2 ENSG00000101846 rs1015958816
+## 3 ENSG00000101846  rs751566199
+## 4 ENSG00000101846 rs1226759900
+## 5 ENSG00000101846  rs987601078
+## 6 ENSG00000101846 rs1268004492</code></pre>
 <pre class="r"><code>dim(variants.df)</code></pre>
-<pre><code>## [1] 93759     2</code></pre>
+<pre><code>## [1] 943031      2</code></pre>
 <pre class="r"><code>glimpse(variants.df)</code></pre>
-<pre><code>## Rows: 93,759
+<pre><code>## Rows: 943,031
 ## Columns: 2
-## $ Variant &lt;chr&gt; &quot;rs1267059404&quot;, &quot;rs749890299&quot;, &quot;rs1397690604&quot;, &quot;rs1271638610&quot;,…
-## $ GENEID  &lt;chr&gt; &quot;ENSG00000125148&quot;, &quot;ENSG00000125148&quot;, &quot;ENSG00000125148&quot;, &quot;ENSG…</code></pre>
+## $ GENEID   &lt;chr&gt; &quot;ENSG00000101846&quot;, &quot;ENSG00000101846&quot;, &quot;ENSG00000101846&quot;, &quot;ENS…
+## $ Variants &lt;chr&gt; &quot;rs1002716891&quot;, &quot;rs1015958816&quot;, &quot;rs751566199&quot;, &quot;rs1226759900&quot;…</code></pre>
 <pre class="r"><code># Count the number of variant alleles per gene id 
 variants.sum &lt;- variants.df %&gt;%
     group_by(GENEID) %&gt;%
-    summarize(Counts=n())
+    summarize(Counts=n()) 
 
 # Explore the output data frame
 head(variants.sum)</code></pre>
 <pre><code>## # A tibble: 6 x 2
 ##   GENEID          Counts
 ##   &lt;chr&gt;            &lt;int&gt;
-## 1 ENSG00000069011   2265
-## 2 ENSG00000079459  20404
-## 3 ENSG00000101361   2288
-## 4 ENSG00000108691    514
-## 5 ENSG00000125148    294
-## 6 ENSG00000127951   1403</code></pre>
+## 1 ENSG00000005075   1921
+## 2 ENSG00000037042   2093
+## 3 ENSG00000101846 108520
+## 4 ENSG00000140459   6816
+## 5 ENSG00000140839   4279
+## 6 ENSG00000146707   5179</code></pre>
 <pre class="r"><code>dim(variants.sum)</code></pre>
-<pre><code>## [1] 11  2</code></pre>
+<pre><code>## [1] 49  2</code></pre>
 <pre class="r"><code>glimpse(variants.sum)</code></pre>
-<pre><code>## Rows: 11
+<pre><code>## Rows: 49
 ## Columns: 2
-## $ GENEID &lt;chr&gt; &quot;ENSG00000069011&quot;, &quot;ENSG00000079459&quot;, &quot;ENSG00000101361&quot;, &quot;ENSG0…
-## $ Counts &lt;int&gt; 2265, 20404, 2288, 514, 294, 1403, 13418, 3628, 1103, 45343, 30…</code></pre>
+## $ GENEID &lt;chr&gt; &quot;ENSG00000005075&quot;, &quot;ENSG00000037042&quot;, &quot;ENSG00000101846&quot;, &quot;ENSG0…
+## $ Counts &lt;int&gt; 1921, 2093, 108520, 6816, 4279, 5179, 5084, 1634, 2856, 31376, …</code></pre>
 <pre class="r"><code># Save the output as csv files
 write.csv(variants.df, &quot;total_variants.csv&quot;)
-write.csv(variants.sum, &quot;counted_variants.csv&quot;)</code></pre>
+write.csv(variants.sum, &quot;counted_variants.csv&quot;)
+
+
+## NOTE: The genes missing in the csv files have zero variant!! </code></pre>
 </div>
 <div id="session-info" class="section level3">
 <h3>Session Info</h3>
@@ -311,23 +395,23 @@ write.csv(variants.sum, &quot;counted_variants.csv&quot;)</code></pre>
 ## 
 ## other attached packages:
 ##  [1] jsonlite_1.7.2  httr_1.4.2      forcats_0.5.1   stringr_1.4.0  
-##  [5] dplyr_1.0.5     purrr_0.3.4     readr_1.4.0     tidyr_1.1.3    
+##  [5] dplyr_1.0.6     purrr_0.3.4     readr_1.4.0     tidyr_1.1.3    
 ##  [9] tibble_3.1.1    ggplot2_3.3.3   tidyverse_1.3.1
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] bslib_0.2.4       tidyselect_1.1.1  xfun_0.20         haven_2.4.1      
+##  [1] tidyselect_1.1.1  xfun_0.20         bslib_0.2.4       haven_2.4.1      
 ##  [5] colorspace_2.0-1  vctrs_0.3.8       generics_0.1.0    htmltools_0.5.1.1
 ##  [9] yaml_2.2.1        utf8_1.2.1        rlang_0.4.11      jquerylib_0.1.4  
 ## [13] pillar_1.6.0      glue_1.4.2        withr_2.4.2       DBI_1.1.1        
 ## [17] dbplyr_2.1.1      modelr_0.1.8      readxl_1.3.1      lifecycle_1.0.0  
 ## [21] munsell_0.5.0     gtable_0.3.0      cellranger_1.1.0  rvest_1.0.0      
 ## [25] evaluate_0.14     knitr_1.31        ps_1.6.0          curl_4.3.1       
-## [29] fansi_0.4.2       broom_0.7.6       Rcpp_1.0.6        scales_1.1.1     
-## [33] backports_1.2.1   fs_1.5.0          hms_1.0.0         digest_0.6.27    
+## [29] fansi_0.4.2       broom_0.7.6       Rcpp_1.0.6        backports_1.2.1  
+## [33] scales_1.1.1      fs_1.5.0          hms_1.0.0         digest_0.6.27    
 ## [37] stringi_1.5.3     grid_4.0.3        cli_2.5.0         tools_4.0.3      
-## [41] sass_0.3.1        magrittr_2.0.1    crayon_1.4.1      pkgconfig_2.0.3  
+## [41] magrittr_2.0.1    sass_0.3.1        crayon_1.4.1      pkgconfig_2.0.3  
 ## [45] ellipsis_0.3.2    xml2_1.3.2        reprex_2.0.0      lubridate_1.7.10 
-## [49] assertthat_0.2.1  rmarkdown_2.7     rstudioapi_0.13   R6_2.5.0         
+## [49] rstudioapi_0.13   assertthat_0.2.1  rmarkdown_2.7     R6_2.5.0         
 ## [53] compiler_4.0.3</code></pre>
 </div>
 
